@@ -1,72 +1,68 @@
-import cv2
-import pytesseract
-from PIL import Image
-import matplotlib.pyplot as plt
-# import numpy as np
-font_scale = 10
-font = cv2.FONT_HERSHEY_PLAIN
 
-pytesseract.pytesseract.tesseract_cmd = "tesseract"
+import config
+import openai
+from cvHandler import captureImageAndExtractText
+
+openai.api_key = config.api_key
 
 
-def imageDetection():
-    image = cv2.imread('demo.png')
-    # text = pytesseract.image_to_string(Image.fromarray(image))
-
-    image2char = pytesseract.image_to_string(image)
-    print(image2char)
-
-    image2boxes = pytesseract.image_to_boxes(image)
-    print(image2boxes)
-
-    imgH, imgW, _ = image.shape
-    for boxes in image2boxes.splitlines():
-        # S 220 1248 321 1398 0 -> sample string
-        boxes = boxes.split(' ')
-        x, y, w, h = int(boxes[1]), int(boxes[2]), int(boxes[3]), int(boxes[4])
-        # cv2.rectangle(imageRef, width, height, color, scale)
-        cv2.rectangle(image, (x, imgH-y), (w, imgH-h), (0, 0, 255), 3)
-
-    plt.imshow(image)
+def askGPT(prompt):
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": f"{prompt}"}
+    ]
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=messages
+    )
+    toreturn = response.choices[0].message['content'].strip()
+    # print(toreturn)
+    return toreturn
 
 
-def videoDetection():
-    cap = cv2.VideoCapture(0)  # loads webcam
-    # cap = cv2.VideoCapture("demo-video.mp4")
-
-    if not cap.isOpened():
-        cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        raise IOError("Cannot open video")
-
-    cntr = 0
-    while True:
-        ret, frame = cap.read()
-        cntr = cntr + 1
-        # read every 20 frames of video
-        if ((cntr % 20) == 0):
-            imgH, imgW, _ = frame.shape
-            x1, y1, w1, h1 = 0, 0, imgH, imgW
-
-            imgchar = pytesseract.image_to_string(frame)
-            imgboxes = pytesseract.image_to_boxes(frame)
-            for boxes in imgboxes.splitlines():
-                boxes = boxes.split(' ')
-                x, y, w, h = int(boxes[1]), int(
-                    boxes[2]), int(boxes[3]), int(boxes[4])
-                cv2.rectangle(frame, (x, imgH-y), (w, imgH-h), (0, 0, 255), 3)
-
-            cv2.putText(frame, imgchar, (x1 + int(w1/50), y1 + int(h1/50)),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-            font = cv2.FONT_HERSHEY_SIMPLEX
-
-            cv2.imshow('Text Detection', frame)
-
-            if cv2.waitKey(2) & 0xFF == ord('q'):
-                break
-
-    cap.release()
-    cv2.destroyAllWindows()
+def get_extracted_text():
+    title = captureImageAndExtractText()
+    return title
+    # return input("What book are you reading? ")
 
 
-videoDetection()
+def get_book_title(extracted_text):
+    prompt = f"Using the following string '{extracted_text}' identify which book it might be.  Please omit all introductory text or subsequent text! Again, only output the title of the book, no explanation, introduction, conclusion  or 'the book is__'."
+    title = askGPT(prompt)
+    return title
+
+
+def get_book_genre(book_title):
+    prompt = f"Based on the book title '{book_title}', determine the genre that the book fits into. Please omit all introductory text and use the following format: <comma_separated_list_of_book_genres>."
+    book_genre = askGPT(prompt)
+    return book_genre
+
+
+def map_to_music_genre(book_genre):
+    prompt = f"Based on the each of the book's genres '{book_genre}', map to a music genre. Such that for the following, the relationship is <Fiction Genre> : <Music Genre>. For example: \n Absurdist : New Wave, Adventure: March/Military, Alternate History: Gregorian Chant, Americana: Ragtime, Chick Literature: Pop, Coming of Age: Folk, Crime: Rap/Hip Hop, Cyberpunk: Industrial, Dickensian: Standards, Epic Fantasy: Progressive Metal, Erotica: Latin/Tango, Fable: Rock, Gothic: Black Metal, Historical: Baroque, Humor: Polka, Inspirational: Spiritual/Religious, Mystery: Blues, Poetry: Jazz, Pulp: Lounge, War: Death Metal, Romance: Love pop, etc. Please omit all introductory text and omit the book's genre, only output music genres in the following format: <comma_separated_list_of_music_genres>"
+    music_genre = askGPT(prompt)
+    return music_genre
+
+
+def generate_sonic_pi_code(music_genre):
+    prompt = f"Based on the music genres '{music_genre}', create the code for a song within the intersection of these music genres in Sonic Pi. Please omit all introductory text or subsequent text! Again, only output the code to be played in Sonic Pi, no explanation, introduction or conclusion to the code."
+    music_code = askGPT(prompt)
+    return music_code
+
+
+def main():
+    # extracted_text = get_extracted_text()
+    # book_title = get_book_title(extracted_text)
+    book_title = "Harry Potter"
+    book_genre = get_book_genre(book_title)
+    music_genre = map_to_music_genre(book_genre)
+    sonic_pi_code = generate_sonic_pi_code(music_genre)
+
+    print(f"Book Title: {book_title}")
+    # print(f"Book Genre: {book_genre}")
+    # print(f"Book Genre: {music_genre}")
+    print("=== SONIC PI CODE ===")
+    print(sonic_pi_code)
+
+
+main()
