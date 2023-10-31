@@ -51,9 +51,8 @@ def generate_sonic_pi_code(music_genre):
 
 
 def main():
-    # extracted_text = get_extracted_text()
-    # book_title = get_book_title(extracted_text)
-    book_title = "Harry Potter"
+    extracted_text = get_extracted_text()
+    book_title = get_book_title(extracted_text)
     book_genre = get_book_genre(book_title)
     music_genre = map_to_music_genre(book_genre)
     sonic_pi_code = generate_sonic_pi_code(music_genre)
